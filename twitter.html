@@ -61,7 +61,7 @@
  
 */
  
-var API_KEY = "DfUgYEGI3MYFainCIH09Ag";
+var API_KEY = "Jvl9fory9WLojwgGuZPFw";
  
 //----------------------------------------------------------------------
 // Initialization
@@ -204,6 +204,7 @@ function ui_mute_loop() {
 // Append/prepend a tweet to the timeline
 function showTweet(tweet, append) {
   if (window["tweetFilter"] && tweetFilter(tweet)) return;
+  if (tweet.retweet_count <= 10) return;
 
   var date = new Date(tweet.created_at.replace(/^\w+ (\w+) (\d+) ([\d:]+) \+0000 (\d+)$/,
                                                "$1 $2 $4 $3 UTC"));
@@ -215,7 +216,7 @@ function showTweet(tweet, append) {
     var date_string = Math.round(elapsed / 60) + " hours";
   }
   else {
-    var date_string = date.getDate() + "/" + date.getMonth();
+    var date_string = date.getDate() + "/" + Math.round(date.getMonth()+1);
   }
 
   if (tweet.entities && tweet.entities.urls) {
@@ -240,7 +241,7 @@ function showTweet(tweet, append) {
         <span class='tweet_body'>
           <span class='screenname'>{screenname}</span>
           <span class='content'>{text}</span>
-          <span class='meta'>{meta}</span>
+          <span class='meta'>Date: {meta}&nbsp;Retweets: {retweetcount}</span>
         </span>
       </div>
     </div>
@@ -249,7 +250,8 @@ function showTweet(tweet, append) {
       text: tweet.text, 
       image: tweet.user.profile_image_url,
       screenname: tweet.user.screen_name,
-      meta: date_string
+      meta: date_string,
+      retweetcount: tweet.retweet_count
     }));
 }
  
@@ -278,7 +280,7 @@ function update_timeline_loop() {
     // Fetch tweets from twitter:
     var timeline = fetch_tweets({
       include_entities: true,
-      count: 30,
+      count: 20,
       since_id: $(".tweet_wrapper:first").attr("tweetid")
     });
  
@@ -328,6 +330,7 @@ function show_more_loop() {
     }
     or {
       timeline = fetch_tweets({
+        include_entities: true,
         count: 30,
         max_id: $(".tweet_wrapper:last").attr("tweetid")-1
       });
@@ -515,6 +518,16 @@ body, textarea, input {
   position:absolute;
   display: block;
   height: 50px;
+}
+.tweet_thumb > img {
+  filter: grayscale(100%); /* Current draft standard */
+  -webkit-filter: grayscale(100%); /* New WebKit */
+  -moz-filter: grayscale(100%);
+  -ms-filter: grayscale(100%); 
+  -o-filter: grayscale(100%); /* Not yet supported in Gecko, Opera or IE */ 
+  filter: url(twitter-filters.svg#desaturate); /* Firefox 3.5+ */
+  filter: gray; /* IE */
+  -webkit-filter: grayscale(1); /* Old WebKit */
 }
 .tweet_body {
   margin: -5px 0 0 63px;
