@@ -215,7 +215,7 @@ function showTweet(tweet, append) {
     var date_string = Math.round(elapsed / 60) + " hours";
   }
   else {
-    var date_string = date.getDate() + "/" + date.getMonth();
+    var date_string = date.getDate() + "/" + (date.getMonth()+1);
   }
 
   if (tweet.entities && tweet.entities.urls) {
@@ -328,6 +328,7 @@ function show_more_loop() {
     }
     or {
       timeline = fetch_tweets({
+        include_entities: true,
         count: 30,
         max_id: $(".tweet_wrapper:last").attr("tweetid")-1
       });
