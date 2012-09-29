@@ -80,6 +80,8 @@ var tweeting_button = $("#tweeting_button");
 var status_el = $("#status");
 var counter = $("#tweeting_status");
 
+var oldest_max_id = 0;
+
 //----------------------------------------------------------------------
 // main program loop
  
@@ -203,8 +205,13 @@ function ui_mute_loop() {
  
 // Append/prepend a tweet to the timeline
 function showTweet(tweet, append) {
+  oldest_max_id = tweet.id;
+
   if (window["tweetFilter"] && tweetFilter(tweet)) return;
-  if (tweet.retweet_count <= 10) return;
+
+  var min_rt_rate_per_h = 5;  // minimum of retweets per hour
+  var max_rt_hours = 4;       // after a tweet is older than max_rt_hours, the rt/h are calculated for the first max_rt_hours hours.
+  var filtered = false;
 
   var date = new Date(tweet.created_at.replace(/^\w+ (\w+) (\d+) ([\d:]+) \+0000 (\d+)$/,
                                                "$1 $2 $4 $3 UTC"));
@@ -219,8 +226,24 @@ function showTweet(tweet, append) {
     var date_string = date.getDate() + "/" + Math.round(date.getMonth()+1);
   }
 
+  var rt_info;
+  if ( elapsed < 60*max_rt_hours ) {
+    rt_info = Math.round(elapsed/60*100)/100 + " hours old, " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h";
+    if ( tweet.retweet_count < elapsed/60*min_rt_rate_per_h ) {
+      filtered = true;
+      //return; // less than 24h old, and less than "elapsed hours" * "minimum retweets per hour" retweets
+    }
+  } else {
+    rt_info = "More than " + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h";
+    if ( tweet.retweet_count < max_rt_hours*min_rt_rate_per_h ) {
+      filtered = true;
+      //return; // older than 24h old, and less than 24 * "minimum retweets per hour" retweets (I assume a tweet gets only retweeted during the first 24 hours)
+    }
+  }
+
   if (tweet.entities && tweet.entities.urls) {
     for (var i = tweet.entities.urls.length - 1, entity; entity = tweet.entities.urls[i]; --i) {
+
       tweet.text = common.supplant("{a}<a target='_blank' href='{b}'>{b}</a>{c}", {
         a: tweet.text.substring(0, entity.indices[0]),
         b: entity.url,
@@ -228,12 +251,15 @@ function showTweet(tweet, append) {
       });
     }
   }
+
   // Construct the html for the tweet. Note how we can use
   // multiline strings in StratifiedJS. We also use the
   // 'supplant' function from the 'common' module for getting
   // values into our string:
+  var filtered_str = filtered ? "tweet_filtered" : "tweet_notfiltered";
+
   $("#timeline")[append ? "append" : "prepend"](common.supplant("\
-    <div class='timeline_item user_{screenname}'>
+    <div class='timeline_item user_{screenname} {filtered}'>
       <div class='tweet_wrapper' tweetid='{tweetid}'>
         <span class='tweet_thumb'>
           <img src='{image}' width='48' height='48'/>
@@ -241,7 +267,7 @@ function showTweet(tweet, append) {
         <span class='tweet_body'>
           <span class='screenname'>{screenname}</span>
           <span class='content'>{text}</span>
-          <span class='meta'>Date: {meta}&nbsp;Retweets: {retweetcount}</span>
+          <span class='meta'>{meta}&nbsp;Retweets: {retweetcount}</span>
         </span>
       </div>
     </div>
@@ -251,7 +277,8 @@ function showTweet(tweet, append) {
       image: tweet.user.profile_image_url,
       screenname: tweet.user.screen_name,
       meta: date_string,
-      retweetcount: tweet.retweet_count
+      retweetcount: rt_info,
+      filtered: filtered_str
     }));
 }
  
@@ -280,7 +307,7 @@ function update_timeline_loop() {
     // Fetch tweets from twitter:
     var timeline = fetch_tweets({
       include_entities: true,
-      count: 20,
+      count: 200,
       since_id: $(".tweet_wrapper:first").attr("tweetid")
     });
  
@@ -331,8 +358,9 @@ function show_more_loop() {
     or {
       timeline = fetch_tweets({
         include_entities: true,
-        count: 30,
-        max_id: $(".tweet_wrapper:last").attr("tweetid")-1
+        count: 200,
+        max_id: oldest_max_id
+        //max_id: $(".tweet_wrapper:last").attr("tweetid")-1
       });
       if (!timeline.length) return; // we've loaded all tweets there are
     }
@@ -514,6 +542,9 @@ body, textarea, input {
 .timeline_item, .tweet_box {
   border-bottom: 1px solid #eee;
 }
+.tweet_filtered {
+  border-left: 3px solid red;
+}
 .tweet_thumb {
   position:absolute;
   display: block;
@@ -525,7 +556,7 @@ body, textarea, input {
   -moz-filter: grayscale(100%);
   -ms-filter: grayscale(100%); 
   -o-filter: grayscale(100%); /* Not yet supported in Gecko, Opera or IE */ 
-  filter: url(twitter-filters.svg#desaturate); /* Firefox 3.5+ */
+  filter: url(filters.svg#desaturate); /* Firefox 3.5+ */
   filter: gray; /* IE */
   -webkit-filter: grayscale(1); /* Old WebKit */
 }
