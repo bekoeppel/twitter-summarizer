@@ -316,7 +316,11 @@ function update_timeline_loop() {
     if (timeline && timeline.length) {
       // Prepend tweets to timeline:
       for (var i = timeline.length-1, tweet; tweet = timeline[i]; --i)
-        showTweet(tweet, false);
+
+      	// For some reason Twitter is returning the since_id in the results...filter this out
+	if (tweet.id != $(".tweet_wrapper:first").attr("tweetid")) {
+	  showTweet(tweet, false);
+	}
     }
 
     waitfor {
