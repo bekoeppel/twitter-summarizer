@@ -205,7 +205,7 @@ function ui_mute_loop() {
  
 // Append/prepend a tweet to the timeline
 function showTweet(tweet, append) {
-  oldest_max_id = tweet.id;
+  oldest_max_id = ( tweet.id < oldest_max_id || oldest_max_id == 0 ) ? tweet.id : oldest_max_id;
 
   if (window["tweetFilter"] && tweetFilter(tweet)) return;
 
@@ -234,12 +234,14 @@ function showTweet(tweet, append) {
       //return; // less than 24h old, and less than "elapsed hours" * "minimum retweets per hour" retweets
     }
   } else {
-    rt_info = "More than " + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h";
+    rt_info = ">" + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h";
     if ( tweet.retweet_count < max_rt_hours*min_rt_rate_per_h ) {
       filtered = true;
       //return; // older than 24h old, and less than 24 * "minimum retweets per hour" retweets (I assume a tweet gets only retweeted during the first 24 hours)
     }
   }
+
+  if (filtered) return;
 
   if (tweet.entities && tweet.entities.urls) {
     for (var i = tweet.entities.urls.length - 1, entity; entity = tweet.entities.urls[i]; --i) {
@@ -632,6 +634,7 @@ button:active {
   padding: 30px  200px 30px 0;
 }
 #welcome a {color: #222}
+a, a:hover, a:visited, a:active { color: #444; }
 </style> 
 </head> 
 <body> 
