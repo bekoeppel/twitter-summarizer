@@ -176,23 +176,62 @@ function ui_mute_loop() {
   if (!window["localStorage"]) return;
   
   var filterArray = [];
-  tweetFilter = function(tweet) {
+  // tweetFilter returns true, if the tweet should not be displayed
+//  tweetFilter = function(tweet) {
+//    for (var i = filterArray.length; i >= 0; --i) {
+//      var keyword = filterArray[i];
+//      if (!keyword) continue;
+//      if (keyword.indexOf("@") == 0 && tweet.user.screen_name == keyword.substring(1)) return true;
+//      else if (tweet.text.indexOf(keyword) != -1) return true;
+//    }
+//
+//    return false;
+//  };
+  getRetweetRequired = function(tweet) {
+    default_min_rt_rate_per_h = 5 // fallback default
+
+    // check all settings (shouldn't this go into a hashmap and then do speedy lookups there instead?)
     for (var i = filterArray.length; i >= 0; --i) {
       var keyword = filterArray[i];
-      if (!keyword) continue;
-      if (keyword.indexOf("@") == 0 && tweet.user.screen_name == keyword.substring(1)) return true;
-      else if (tweet.text.indexOf(keyword) != -1) return true;
-    }
+      if (!keyword) continue;  // process next, if the keyword is empty
+      if (keyword.indexOf("@") != 0 && keyword.indexOf("!") != 0) continue; // process next, if the keyword doesn't start with a @ (users) or ! (global setting)
 
-    return false;
+      // split the keyword at the ":" (format @username:rr), if we need at least rr retweets per hour for tweets from user @username
+      var username = keyword.split(":")[0]
+      var min_rt_rate_per_h = keyword.split(":")[1]
+
+      // if this setting is for the default user, then return it's required rate
+      if ( username == "@" + tweet.user.screen_name ) {
+        return min_rt_rate_per_h;
+      } 
+
+      // if this is a global default setting, then overwrite the default_min_rt_rate_per_h
+      if ( username == "!default" ) {
+        default_min_rt_rate_per_h = min_rt_rate_per_h;
+      }
+    }
+    return default_min_rt_rate_per_h; // default
   };
   
-  var button = $("<a href='#'>Mute list</a>").prependTo("#session_buttons");
+  // TODO: replace this with sliders for each follower and a global slider
+  var button = $("<a href='#'>Mute Settings</a>").prependTo("#session_buttons");
   try {
     while(true) {
-      filterArray = localStorage.mute ? localStorage.mute.split(" ") : [];
-      button.$click();
-      var rv = prompt("Enter a space-separated list of #keywords or @users you want to mute.", localStorage.mute);
+      filterArray = localStorage.mute ? localStorage.mute.split(";") : [];
+      button.$click();  // this line blocks until the button is clicked
+      //var rv = prompt("Enter a space-separated list of #keywords or @users you want to mute.", localStorage.mute);
+      var rv = prompt([
+          "How many re-tweets are required to make a tweet interesting?",
+          "",
+          "You can configure the default value with !default:X and overwrite it for a particular user with @username:X.",
+          "If a tweet gets more than X retweets per hour, it will be displayed. Otherwise, the tweet is ignored.",
+          "",
+          "The individual values are separated by a semicolon (;).",
+          "",
+          "Example: !default:5;@TechCrunch:10;@elonmusk:50;@NZZ:3"
+        ].join('\n'),
+        localStorage.mute
+      );
       if (rv != null) {
         localStorage.mute = rv;
         $(window).trigger("settingschanged");
@@ -207,9 +246,10 @@ function ui_mute_loop() {
 function showTweet(tweet, append) {
   oldest_max_id = ( tweet.id < oldest_max_id || oldest_max_id == 0 ) ? tweet.id : oldest_max_id;
 
-  if (window["tweetFilter"] && tweetFilter(tweet)) return;
+  //if (window["tweetFilter"] && tweetFilter(tweet)) return;
 
-  var min_rt_rate_per_h = 5;  // minimum of retweets per hour
+  //var min_rt_rate_per_h = 5;  // minimum of retweets per hour
+  var min_rt_rate_per_h = getRetweetRequired(tweet);  // minimum of retweets per hour
   var max_rt_hours = 4;       // after a tweet is older than max_rt_hours, the rt/h are calculated for the first max_rt_hours hours.
   var filtered = false;
 
@@ -228,13 +268,13 @@ function showTweet(tweet, append) {
 
   var rt_info;
   if ( elapsed < 60*max_rt_hours ) {
-    rt_info = Math.round(elapsed/60*100)/100 + " hours old, " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h";
+    rt_info = Math.round(elapsed/60*100)/100 + " hours old, " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(min_rt_rate_per_h) + " rt/h required";
     if ( tweet.retweet_count < elapsed/60*min_rt_rate_per_h ) {
       filtered = true;
       //return; // less than 24h old, and less than "elapsed hours" * "minimum retweets per hour" retweets
     }
   } else {
-    rt_info = ">" + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h";
+    rt_info = ">" + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h, " + Math.round(min_rt_rate_per_h) + " rt/h required";
     if ( tweet.retweet_count < max_rt_hours*min_rt_rate_per_h ) {
       filtered = true;
       //return; // older than 24h old, and less than 24 * "minimum retweets per hour" retweets (I assume a tweet gets only retweeted during the first 24 hours)
