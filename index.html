@@ -119,7 +119,7 @@ function main() {
       background: common.supplant("#{color} url({image}) {repeat}", {
         color:  profile.profile_background_color,
         image:  profile.profile_background_image_url,
-        repeat: profile.profile_background_tile ? "repeat" : "no-repeat"
+        repeat: profile.profile_background_tile ? "repeat" : "no-repeat fixed"
       })
     });  
   
