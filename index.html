@@ -172,6 +172,26 @@ function update_counter() {
   counter.text(140 - status_el.val().length);
 }
 
+// store the last read position
+function set_last_read(tweet_id) {
+  if (!window["localStorage"]) return;
+	localStorage.last_read = tweet_id;
+}
+
+function is_newer_than_last_read(tweet) {
+  if (!window["localStorage"]) return;
+
+	// no last_read: tweet is always newer than last_read
+	last_read = localStorage.last_read ? localStorage.last_read : 0;
+
+	if ( tweet.id > last_read ) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+
 function ui_mute_loop() {
   if (!window["localStorage"]) return;
   
@@ -268,13 +288,13 @@ function showTweet(tweet, append) {
 
   var rt_info;
   if ( elapsed < 60*max_rt_hours ) {
-    rt_info = Math.round(elapsed/60*100)/100 + " hours old, " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(min_rt_rate_per_h) + " rt/h required";
+    rt_info = Math.round(elapsed/60*100)/100 + " hours old, " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + min_rt_rate_per_h + " rt/h required";
     if ( tweet.retweet_count < elapsed/60*min_rt_rate_per_h ) {
       filtered = true;
       //return; // less than 24h old, and less than "elapsed hours" * "minimum retweets per hour" retweets
     }
   } else {
-    rt_info = ">" + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h, " + Math.round(min_rt_rate_per_h) + " rt/h required";
+    rt_info = ">" + max_rt_hours + " hours old (" + Math.round(elapsed/60) + "), " + tweet.retweet_count + " retweets, " + Math.round(tweet.retweet_count/(elapsed/60)*100)/100 + " rt/h, " + Math.round(tweet.retweet_count/max_rt_hours*100)/100 + " rt/4h, " + 4*min_rt_rate_per_h + " rt/4h required";
     if ( tweet.retweet_count < max_rt_hours*min_rt_rate_per_h ) {
       filtered = true;
       //return; // older than 24h old, and less than 24 * "minimum retweets per hour" retweets (I assume a tweet gets only retweeted during the first 24 hours)
@@ -282,6 +302,9 @@ function showTweet(tweet, append) {
   }
 
   if (filtered) return;
+
+	// check if tweet is new
+	is_new = is_newer_than_last_read(tweet);
 
   if (tweet.entities && tweet.entities.urls) {
     for (var i = tweet.entities.urls.length - 1, entity; entity = tweet.entities.urls[i]; --i) {
@@ -299,9 +322,10 @@ function showTweet(tweet, append) {
   // 'supplant' function from the 'common' module for getting
   // values into our string:
   var filtered_str = filtered ? "tweet_filtered" : "tweet_notfiltered";
+	var is_new_str = is_new ? "tweet_is_new" : "tweet_is_not_new";
 
   $("#timeline")[append ? "append" : "prepend"](common.supplant("\
-    <div class='timeline_item user_{screenname} {filtered}'>
+		<div class='timeline_item user_{screenname} {filtered} {is_new}' onclick='set_last_read({tweetid})'>
       <div class='tweet_wrapper' tweetid='{tweetid}'>
         <span class='tweet_thumb'>
           <img src='{image}' width='48' height='48'/>
@@ -320,7 +344,8 @@ function showTweet(tweet, append) {
       screenname: tweet.user.screen_name,
       meta: date_string,
       retweetcount: rt_info,
-      filtered: filtered_str
+			filtered: filtered_str,
+			is_new: is_new_str
     }));
 }
  
@@ -597,6 +622,11 @@ body, textarea, input {
 .tweet_filtered {
   border-left: 3px solid red;
 }
+.tweet_is_not_new {
+  border-left: 2px ridge grey;
+  border-right: 2px ridge grey;
+	background: #dfdfdf;
+}
 .tweet_thumb {
   position:absolute;
   display: block;
@@ -623,7 +653,6 @@ body, textarea, input {
 }
 .tweet_body .meta {
   display:block;
-  line-height: 25px;
 }
 .tweet_body .meta, #latest {
   font-size: 11px;
